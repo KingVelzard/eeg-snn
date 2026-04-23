@@ -1,0 +1,4 @@
+torch>=2.0
+numpy>=1.23
+brainflow>=5.10
+scipy>=1.10
