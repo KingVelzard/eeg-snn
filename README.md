@@ -70,9 +70,17 @@ Use the readout layer's final (or time-mean) **membrane potential** as logits �
 ## Repo layout
 
 ```
-cuda/           CUDA LIF forward + backward + pybind11 binding
-eeg_srnn/       LIFLayer (PyTorch nn.Module wrapping lif_cuda)
-setup.py        Builds the lif_cuda extension
+stack_validation/   end-to-end eyes-open/closed pipeline (PhysioNet + own data)
+  montage.py        16-ch 10-20 channel list (shared across all paradigms)
+  preprocess.py     bandpass + notch + CAR + epoch + reject + z-score
+  encode.py         delta spike encoder (N,C,T) -> (N,2C,T)
+  model.py          snnTorch LIF classifier (2C -> 64 -> 32 -> 2)
+  train.py          BPTT training CLI
+  loaders/          per-source loaders (physionet.py; openbci.py is TODO)
+eyes_detector.py    classical alpha-power baseline (non-SNN) for comparison
+cuda/               hand-written CUDA LIF kernels  (BROKEN, see Status)
+eeg_srnn/           PyTorch nn.Module wrapping lif_cuda  (depends on broken cuda/)
+setup.py            builds lif_cuda  (BROKEN, see Status)
 requirements.txt
 ```
 
@@ -80,15 +88,31 @@ requirements.txt
 
 ```
 pip install -r requirements.txt
-python setup.py install        # builds lif_cuda (needs CUDA toolkit + MSVC)
 ```
 
-## MVP checklist
+The SNN backend is **snnTorch** (pure PyTorch). The local CUDA LIF layer in `cuda/`
+and `eeg_srnn/` is not currently used and does not build (see Status). No
+`python setup.py install` step is needed for the active pipeline.
 
-- [ ] 10 min eyes-open/closed BDF recorded
-- [ ] Loader + epoching from BDF → `(N, C, T_samples)`
-- [ ] CAR + z-score + artifact reject
-- [ ] Delta encoder → `(N, 2C, T_samples)`
-- [ ] Feedforward LIF `2C → 64 → 32 → 2` trains to > 90 % on held-out last 30 %
+## Stack validation
 
-Once this works end-to-end, scale to motor imagery / recurrence / cross-session.
+The eyes-open/closed MVP that validates the full pipeline lives in
+[`stack_validation/`](stack_validation/) and is the active development surface.
+
+Quickstart:
+
+```
+python -m stack_validation.train --subjects 1-10 --epochs 10
+```
+
+First run downloads PhysioNet eegmmidb (~20 EDF files) into MNE's data cache.
+
+Once stack validation works end-to-end, scale to motor imagery / recurrence /
+cross-session.
+
+## Status
+
+- ✅ **Active pipeline:** `stack_validation/` — PhysioNet eyes-open/closed end-to-end with snnTorch.
+- ✅ **Classical baseline:** `eyes_detector.py` — alpha-power threshold detector on an OpenBCI CSV recording.
+- ⏳ **Phase 3 next:** OpenBCI BDF loader + cross-domain comparison (PhysioNet→own).
+- ❌ **CUDA LIF layer (`cuda/`, `eeg_srnn/`, `setup.py`):** broken — several compile-blocking syntax errors (missing commas in `setup.py`, double `<<` in `lif_binding.cpp`, malformed kernel launch and wrong block calc in `lif_backward.cu`) plus a math bug (backward does not propagate gradients through the recurrent voltage state). Not on the critical path; revisit only when GPU-kernel performance becomes the bottleneck.
