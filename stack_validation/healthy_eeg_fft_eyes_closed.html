@@ -1,0 +1,106 @@
+<div style="padding: 1rem 0;">
+<h2 class="sr-only">FFT plot showing healthy EEG spectrum with prominent alpha peak around 10 Hz</h2>
+
+<div style="display: flex; gap: 12px; margin-bottom: 1rem;">
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; flex: 1;">
+    <div style="font-size: 13px; color: var(--color-text-secondary);">Alpha peak</div>
+    <div style="font-size: 20px; font-weight: 500;">8–12 Hz</div>
+  </div>
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; flex: 1;">
+    <div style="font-size: 13px; color: var(--color-text-secondary);">Peak amplitude</div>
+    <div style="font-size: 20px; font-weight: 500;">10–30 µV</div>
+  </div>
+  <div style="background: var(--color-background-secondary); border-radius: var(--border-radius-md); padding: 0.75rem 1rem; flex: 1;">
+    <div style="font-size: 13px; color: var(--color-text-secondary);">Line noise</div>
+    <div style="font-size: 20px; font-weight: 500;">filtered</div>
+  </div>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; font-size: 12px; color: var(--color-text-secondary);">
+  <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 16px; height: 2px; background: #1D9E75;"></span>Healthy signal (eyes closed)</span>
+  <span style="display: flex; align-items: center; gap: 6px;"><span style="width: 16px; height: 0; border-top: 2px dashed #888780;"></span>Bad contact / railed</span>
+</div>
+
+<div style="position: relative; width: 100%; height: 320px;">
+  <canvas id="fftChart" role="img" aria-label="FFT plot comparing healthy EEG spectrum with prominent alpha peak around 10 Hz versus a flat noise floor from a railed channel">Healthy EEG shows a strong peak at 8–12 Hz reaching ~20 µV with a 1/f decay to higher frequencies. A bad channel shows a flat line near 0.5 µV with no peak.</canvas>
+</div>
+
+<div style="margin-top: 1rem; font-size: 13px; color: var(--color-text-secondary); line-height: 1.6;">
+  Log scale, linear frequency axis — same setup as your OpenBCI GUI.
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const freqs = [];
+for (let f = 1; f <= 60; f += 1) freqs.push(f);
+
+function healthy(f) {
+  const oneOverF = 8 / Math.pow(f, 0.9);
+  const alpha = 22 * Math.exp(-Math.pow((f - 10) / 1.6, 2));
+  const beta = 3 * Math.exp(-Math.pow((f - 20) / 4, 2));
+  return oneOverF + alpha + beta + (Math.random() - 0.5) * 0.3;
+}
+
+function bad(f) {
+  return 0.4 + (Math.random() - 0.5) * 0.15;
+}
+
+const healthyData = freqs.map(f => ({ x: f, y: Math.max(0.1, healthy(f)) }));
+const badData = freqs.map(f => ({ x: f, y: Math.max(0.1, bad(f)) }));
+
+new Chart(document.getElementById('fftChart'), {
+  type: 'line',
+  data: {
+    datasets: [
+      {
+        label: 'Healthy',
+        data: healthyData,
+        borderColor: '#1D9E75',
+        backgroundColor: 'rgba(29, 158, 117, 0.08)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0
+      },
+      {
+        label: 'Bad contact',
+        data: badData,
+        borderColor: '#888780',
+        borderWidth: 1.5,
+        borderDash: [4, 4],
+        fill: false,
+        tension: 0.3,
+        pointRadius: 0
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: {
+        type: 'linear',
+        min: 1,
+        max: 60,
+        title: { display: true, text: 'Frequency (Hz)', color: '#888780', font: { size: 12 } },
+        grid: { color: 'rgba(136, 135, 128, 0.15)' },
+        ticks: { color: '#888780', font: { size: 11 } }
+      },
+      y: {
+        type: 'logarithmic',
+        min: 0.1,
+        max: 100,
+        title: { display: true, text: 'Amplitude (µV)', color: '#888780', font: { size: 12 } },
+        grid: { color: 'rgba(136, 135, 128, 0.15)' },
+        ticks: {
+          color: '#888780',
+          font: { size: 11 },
+          callback: (v) => [0.1, 1, 10, 100].includes(v) ? v : ''
+        }
+      }
+    }
+  }
+});
+</script>
+</div>
